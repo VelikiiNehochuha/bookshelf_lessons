@@ -1,7 +1,6 @@
 ## Bookshelf
 
-* установить zero mq (очередь сообщений на которой будет построен наш микросервис)
-(я запишу отдельный ролик как установить zeromq на windows)
+* установить rabbitmq (https://www.rabbitmq.com/install-windows.html#installer)
 
 * Создайть виртульное окружение (средствами pycharm)
 
