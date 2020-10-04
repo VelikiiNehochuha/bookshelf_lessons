@@ -1,6 +1,8 @@
 ## Bookshelf
 
-* установить rabbitmq (https://www.rabbitmq.com/install-windows.html#installer)
+* установить rabbitmq
+** https://www.rabbitmq.com/install-windows.html#installer
+** https://www.erlang.org/downloads
 
 * Создайть виртульное окружение (средствами pycharm)
 

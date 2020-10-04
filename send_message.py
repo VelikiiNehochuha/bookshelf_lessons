@@ -4,21 +4,20 @@ __all__ = [
 import json
 
 
-import zmq
+import pika
 
-
-context = zmq.Context()
-socket = context.socket(zmq.REQ)
 
 
 def send_message_to_search_book(payload):
     try:
-        print(payload)
-        socket.connect("tcp://localhost:5555")
-        socket.send_string(json.dumps(payload))
+        connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+        channel = connection.channel()
+        channel.queue_declare(queue='hello')
+        channel.basic_publish(exchange='',
+                              routing_key='hello',
+                              body=json.dumps(payload))
+        connection.close()
         print("Успешно отправили сообщение в мироксервис search book")
-        message = socket.recv()
-        print(message)
     except Exception as e:
         print(e)
         print("Микросервис search book не доступен")

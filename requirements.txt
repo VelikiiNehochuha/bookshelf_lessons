@@ -1,2 +1,2 @@
 Flask
-PyZMQ
+pika

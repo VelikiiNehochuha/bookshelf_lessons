@@ -1,22 +1,30 @@
 #
-#   Hello World server in Python
-#   Binds REP socket to tcp://*:5555
-#   Expects b"Hello" from client, replies with b"World"
+#   Получаем сообщения из очереди (rabbitmq) и обрабатываем их
 #
 
-import time
-import zmq
+import pika, sys, os
 
-context = zmq.Context()
-socket = context.socket(zmq.REP)
-socket.bind("tcp://*:5555")
+def main():
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+    channel = connection.channel()
 
-print("Микросервис поиска книг в магазине запущен")
+    channel.queue_declare(queue='hello')
 
-while True:
-    message = socket.recv()
-    print("Получили запрос на поиск книги в магазинах request: %s" % message)
-    socket.send(b"Ok")
+    def callback(ch, method, properties, body):
+        print(" [x] Received %r" % body)
 
-    #  Тут нужно написать функцию по поиску книги в магазине и сохранение результатов в базе данных
-    time.sleep(1)
+    channel.basic_consume(queue='hello', on_message_callback=callback, auto_ack=True)
+
+    print(' [*] Ждем сообщения в очереди. Для выхода нажмите CTRL+C')
+    channel.start_consuming()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        print('Исполнение прервано администратором')
+        try:
+            sys.exit(0)
+        except SystemExit:
+            os._exit(0)
