@@ -12,7 +12,7 @@ def send_message_to_search_book(payload):
     try:
         connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
         channel = connection.channel()
-        channel.queue_declare(queue='hello')
+        channel.queue_declare(queue='search_book')
         channel.basic_publish(exchange='',
                               routing_key='hello',
                               body=json.dumps(payload))

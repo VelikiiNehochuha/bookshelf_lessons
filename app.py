@@ -2,17 +2,11 @@ import sqlite3
 
 from flask import Flask, render_template, request, jsonify
 
+from utils import dict_factory
 from send_message import send_message_to_search_book
 
 
 app = Flask("bookshelf")
-
-
-def dict_factory(cursor, row):
-    d = {}
-    for idx, col in enumerate(cursor.description):
-        d[col[0]] = row[idx]
-    return d
 
 
 @app.route('/')
