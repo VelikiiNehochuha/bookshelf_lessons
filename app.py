@@ -1,12 +1,14 @@
 import sqlite3
 
 from flask import Flask, render_template, request, jsonify
+import structlog
 
 from utils import dict_factory
 from send_message import send_message_to_search_book
 
 
 app = Flask("bookshelf")
+logger = structlog.getLogger()
 
 
 @app.route('/')
@@ -38,7 +40,7 @@ def api_books():
     if request.method == "POST":
         """Добавить книгу"""
         payload = request.get_json()
-        print(payload)
+        logger.info(payload)
         # работа с базой данных
         connection = sqlite3.connect('bookshelf.db')
         cursor = connection.cursor()
@@ -48,7 +50,7 @@ def api_books():
         book_id = cursor.fetchone()[0]
         connection.commit()
         connection.close()
-        print(book_id)
+        logger.info(book_id)
         send_message_to_search_book({
             "name": payload["name"],
             "author": payload["author"]
@@ -72,6 +74,22 @@ def api_books_item():
     if request.method == "DELETE":
         """Удалить книгу"""
     assert False, "Нет такой операции"
+
+
+@app.route('/api/search-results/<book_id>', methods=["GET"])
+def search_results(book_id):
+    """обращение к микросервису поиска книг за результами поиска книги"""
+    print(book_id)
+    # for result in db_results:
+    #     results.append({
+    #         "id": result["id"],
+    #         "name": result["name"],
+    #         "author": result["author"],
+    #         "pages": result["pages"],
+    #         "user_email": result["email"]
+    #     })
+    return jsonify({"results": []})
+
 
 
 app.run(debug=True)  # запуск сервера

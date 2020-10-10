@@ -2,3 +2,4 @@ Flask
 pika
 requests
 beautifulsoup4
+structlog
