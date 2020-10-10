@@ -70,7 +70,8 @@
         }
 
         var display_search_results = function (search_result) {
-            $('#all_search_results tr:first').after(
+            console.log($('#all_search_results tr:first'))
+            $('#all_search_results').append(
                 '<tr>' +
                     '<td>' + search_result.shop + '</td>' +
                     '<td>' + search_result.price + '</td>' +
@@ -118,9 +119,10 @@
             $.ajax({
                 type: "GET",
                 url: '/api/search-results/' + id,
-                success: function (results) {
-                    if (results) {
-                        results.map(display_search_results);
+                success: function (resp) {
+                    console.log(resp);
+                    if (resp.results) {
+                        resp.results.map(display_search_results);
                     }
                 },
                 contentType : 'application/json'
@@ -139,6 +141,7 @@
           </div>
           <div class="modal-body">
             <table id="all_search_results"  class="table">
+                <tr><td></td><td></td></tr>
             </table>
           </div>
           <div class="modal-footer">

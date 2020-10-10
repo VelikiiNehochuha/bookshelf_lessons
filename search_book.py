@@ -55,11 +55,12 @@ def search_book_at_shops(dshop, book):
 
 
 def callback_on_search_book(ch, method, properties, body):
+    """слушаем очередь и на получение задания ищем книгу в интернет магазине"""
     logger.info(body)
     json_body = json.loads(body)
 
     # книга доступна нужно сохранить результаты в бд
-    db_conn = sqlite3.connect('bookshelf_search_book.db')
+    db_conn = sqlite3.connect('bookshelf_search_book.db', check_same_thread=False)
     db_conn.row_factory = dict_factory
     cursor = db_conn.cursor()
     cursor.execute("SELECT * from books where name = ? and author = ? limit 1", [json_body["name"], json_body["author"]])
@@ -72,7 +73,7 @@ def callback_on_search_book(ch, method, properties, body):
     if not result["is_available"]:
         logger.info(result)
         return
-    db_conn = sqlite3.connect('bookshelf_search_book.db')
+    db_conn = sqlite3.connect('bookshelf_search_book.db', check_same_thread=False)
     if not exist_book:
         cursor = db_conn.cursor()
         cursor.execute("INSERT INTO books (name, author) values(?, ?);",
@@ -81,6 +82,7 @@ def callback_on_search_book(ch, method, properties, body):
         book_id = cursor.fetchone()[0]
     else:
         book_id = exist_book["id"]
+        cursor = db_conn.cursor()
     cursor.execute("INSERT INTO books_to_shops (shop_id, book_id, price, from_datetime) values(?, ?, ?, ?);",
                    [shop["id"], book_id, result["price"], datetime.datetime.now()])
     db_conn.commit()
@@ -88,22 +90,105 @@ def callback_on_search_book(ch, method, properties, body):
     logger.info("Добавлен результат поиска книги в магазине в базу данных микросервиса")
 
 
-def main():
+def callback_on_get_search_results(ch, method, properties, body):
+    """если приходит сообщение получить результаты поискового запроса,
+    то проверяем их по базе и возвращаем результаты"""
+    logger.info("request on get search result")
+    json_body = json.loads(body)
+    book = json_body["book"]
+    user_id = json_body["user_id"]
+    logger.info(json_body)
+
+    db_conn = sqlite3.connect('bookshelf_search_book.db', check_same_thread=False)
+    db_conn.row_factory = dict_factory
+    cursor = db_conn.cursor()
+    cursor.execute("""
+    SELECT shops.name, books_to_shops.price from shops join books_to_shops on books_to_shops.shop_id = shops.id
+     join books on books_to_shops.book_id = books.id WHERE books.name = ? and books.author = ?;""",
+                   [book["name"], book["author"]])
+    results = cursor.fetchall()
+    db_conn.close()
+    results = [{
+        "shop": res["name"],
+        "price": res["price"]
+    } for res in results]
+    print(results)
+
+    try:
+        connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+        channel = connection.channel()
+        queue = f'get_search_results_{user_id}'
+        channel.queue_declare(queue=queue)
+        channel.basic_publish(exchange='',
+                              routing_key=queue,
+                              body=json.dumps(results))
+        connection.close()
+        logger.info("Успешно отправлено уведомление пользователю")
+    except Exception as e:
+        logger.error(e)
+
+
+def main_tread():
     """слушаем очередь и на получение задания ищем книгу в интернет магазине"""
     connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
     channel = connection.channel()
     channel.queue_declare(queue='search_book')
     channel.basic_consume(queue='search_book', on_message_callback=callback_on_search_book, auto_ack=True)
-    logger.info(' [*] Ждем сообщений в очереди. Для выхода нажмите CTRL+C')
+    logger.info(' [*] Ждем сообщений в очереди search_book. Для выхода нажмите CTRL+C')
+    channel.start_consuming()
+
+
+def get_results_tread():
+    """слушаем очередь и на получение задания ищем книгу в интернет магазине"""
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+    channel = connection.channel()
+    channel.queue_declare(queue='get_search_results')
+    channel.basic_consume(queue='get_search_results', on_message_callback=callback_on_get_search_results, auto_ack=True)
+    logger.info(' [*] Ждем сообщений в очереди get_search_results. Для выхода нажмите CTRL+C')
     channel.start_consuming()
 
 
 if __name__ == '__main__':
+    import threading
     try:
-        main()
+        threading.Thread(target=main_tread, args=(), daemon=True).start()
+        threading.Thread(target=get_results_tread, args=(), daemon=True).start()
+        while True:
+            import time
+            time.sleep(10)
     except KeyboardInterrupt:
         logger.info('Исполнение прервано администратором')
         try:
             sys.exit(0)
         except SystemExit:
             os._exit(0)
+# if __name__ == '__main__':
+#     try:
+#         channel = None
+#
+#         parameters = pika.URLParameters('amqp://guest:guest@localhost:5672/%2F')
+#
+#         def on_open(connection):
+#             logger.info("open connection")
+#             connection.channel(on_channel_open=on_channel_open)
+#
+#         def on_channel_open(new_channel):
+#             logger.info("open channel")
+#             global channel
+#             channel = new_channel
+#             new_channel.queue_declare(queue='search_book')
+#             # new_channel.queue_declare(queue='get_search_results')
+#
+#         def on_queue_declared(frame):
+#             """Called when RabbitMQ has told us our Queue has been declared, frame is the response from RabbitMQ"""
+#             logger.info(frame)
+#             channel.basic_consume(callback_on_search_book, queue='search_book', auto_ack=True)
+#             # channel1.basic_consume(callback_on_get_search_results, queue='get_search_results', auto_ack=True)
+#
+#
+#         conn = pika.SelectConnection(parameters=parameters, on_open_callback=on_open)
+#         conn.ioloop.start()
+#     except KeyboardInterrupt:
+#         conn.close()
+#         conn.ioloop.start()
+#         logger.info('Исполнение прервано администратором')
