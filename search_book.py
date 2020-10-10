@@ -162,33 +162,3 @@ if __name__ == '__main__':
             sys.exit(0)
         except SystemExit:
             os._exit(0)
-# if __name__ == '__main__':
-#     try:
-#         channel = None
-#
-#         parameters = pika.URLParameters('amqp://guest:guest@localhost:5672/%2F')
-#
-#         def on_open(connection):
-#             logger.info("open connection")
-#             connection.channel(on_channel_open=on_channel_open)
-#
-#         def on_channel_open(new_channel):
-#             logger.info("open channel")
-#             global channel
-#             channel = new_channel
-#             new_channel.queue_declare(queue='search_book')
-#             # new_channel.queue_declare(queue='get_search_results')
-#
-#         def on_queue_declared(frame):
-#             """Called when RabbitMQ has told us our Queue has been declared, frame is the response from RabbitMQ"""
-#             logger.info(frame)
-#             channel.basic_consume(callback_on_search_book, queue='search_book', auto_ack=True)
-#             # channel1.basic_consume(callback_on_get_search_results, queue='get_search_results', auto_ack=True)
-#
-#
-#         conn = pika.SelectConnection(parameters=parameters, on_open_callback=on_open)
-#         conn.ioloop.start()
-#     except KeyboardInterrupt:
-#         conn.close()
-#         conn.ioloop.start()
-#         logger.info('Исполнение прервано администратором')
