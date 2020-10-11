@@ -65,7 +65,7 @@
                     '<td>' + book.author + '</td>' +
                     '<td>' + book.pages + '</td>' +
                     '<td>' + book.user_email + '</td>' +
-                    '<td>' + '<a href="#" data-toggle="modal" data-target="#search_result" data-id="' + book.id + '">показать</a>' + '</td>' +
+                    '<td>' + '<a href="#" data-toggle="modal" data-target="#search_result" data-name="' + book.name + '" data-author="' + book.author + '">показать</a>' + '</td>' +
                 '</tr>');
         }
 
@@ -114,11 +114,12 @@
 
         $(document).on('show.bs.modal','#search_result', function (e) {
             console.log("Открыли модалку");
-            let id = e.relatedTarget.dataset.id;
+            let name = e.relatedTarget.dataset.name;
+            let author = e.relatedTarget.dataset.author;
             $('#all_search_results').empty();
             $.ajax({
                 type: "GET",
-                url: '/api/search-results/' + id,
+                url: 'http://localhost:9999/api/search-results?name=' + name + '&author=' + author,
                 success: function (resp) {
                     console.log(resp);
                     if (resp.results) {

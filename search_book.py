@@ -11,11 +11,15 @@ import structlog
 import pika
 import requests
 from bs4 import BeautifulSoup
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 from utils import dict_factory
 
 
 logger = structlog.getLogger()
+app = Flask("bookshelf_search_book")
+cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 
 def search_book_at_shops(dshop, book):
@@ -90,44 +94,6 @@ def callback_on_search_book(ch, method, properties, body):
     logger.info("Добавлен результат поиска книги в магазине в базу данных микросервиса")
 
 
-def callback_on_get_search_results(ch, method, properties, body):
-    """если приходит сообщение получить результаты поискового запроса,
-    то проверяем их по базе и возвращаем результаты"""
-    logger.info("request on get search result")
-    json_body = json.loads(body)
-    book = json_body["book"]
-    user_id = json_body["user_id"]
-    logger.info(json_body)
-
-    db_conn = sqlite3.connect('bookshelf_search_book.db', check_same_thread=False)
-    db_conn.row_factory = dict_factory
-    cursor = db_conn.cursor()
-    cursor.execute("""
-    SELECT shops.name, books_to_shops.price from shops join books_to_shops on books_to_shops.shop_id = shops.id
-     join books on books_to_shops.book_id = books.id WHERE books.name = ? and books.author = ?;""",
-                   [book["name"], book["author"]])
-    results = cursor.fetchall()
-    db_conn.close()
-    results = [{
-        "shop": res["name"],
-        "price": res["price"]
-    } for res in results]
-    print(results)
-
-    try:
-        connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-        channel = connection.channel()
-        queue = f'get_search_results_{user_id}'
-        channel.queue_declare(queue=queue)
-        channel.basic_publish(exchange='',
-                              routing_key=queue,
-                              body=json.dumps(results))
-        connection.close()
-        logger.info("Успешно отправлено уведомление пользователю")
-    except Exception as e:
-        logger.error(e)
-
-
 def main_tread():
     """слушаем очередь и на получение задания ищем книгу в интернет магазине"""
     connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
@@ -138,24 +104,34 @@ def main_tread():
     channel.start_consuming()
 
 
-def get_results_tread():
-    """слушаем очередь и на получение задания ищем книгу в интернет магазине"""
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
-    channel = connection.channel()
-    channel.queue_declare(queue='get_search_results')
-    channel.basic_consume(queue='get_search_results', on_message_callback=callback_on_get_search_results, auto_ack=True)
-    logger.info(' [*] Ждем сообщений в очереди get_search_results. Для выхода нажмите CTRL+C')
-    channel.start_consuming()
+@app.route('/api/search-results', methods=["GET"])
+def search_results():
+    """обращение к микросервису поиска книг за результами поиска книги"""
+    name = request.args.get('name')
+    author = request.args.get('author')
+
+    db_conn = sqlite3.connect('bookshelf_search_book.db', check_same_thread=False)
+    db_conn.row_factory = dict_factory
+    cursor = db_conn.cursor()
+    cursor.execute("""
+        SELECT shops.name, books_to_shops.price from shops join books_to_shops on books_to_shops.shop_id = shops.id
+         join books on books_to_shops.book_id = books.id WHERE books.name = ? and books.author = ?;""",
+                   [name, author])
+    results = cursor.fetchall()
+    db_conn.close()
+    results = [{
+        "shop": res["name"],
+        "price": res["price"]
+    } for res in results]
+    return jsonify({"results": results or []})
 
 
 if __name__ == '__main__':
     import threading
     try:
         threading.Thread(target=main_tread, args=(), daemon=True).start()
-        threading.Thread(target=get_results_tread, args=(), daemon=True).start()
-        while True:
-            import time
-            time.sleep(10)
+        # REST API микросервиса
+        app.run(debug=True, port=9999)
     except KeyboardInterrupt:
         logger.info('Исполнение прервано администратором')
         try:

@@ -1,4 +1,5 @@
 Flask
+flask-cors
 pika
 requests
 beautifulsoup4

@@ -4,7 +4,7 @@ from flask import Flask, render_template, request, jsonify
 import structlog
 
 from utils import dict_factory
-from send_message import send_message_to_search_book, get_search_results
+from send_message import send_message_to_search_book
 
 
 app = Flask("bookshelf")
@@ -74,26 +74,6 @@ def api_books_item():
     if request.method == "DELETE":
         """Удалить книгу"""
     assert False, "Нет такой операции"
-
-
-@app.route('/api/search-results/<book_id>', methods=["GET"])
-def search_results(book_id):
-    """обращение к микросервису поиска книг за результами поиска книги"""
-    connection = sqlite3.connect('bookshelf.db', check_same_thread=False)
-    connection.row_factory = dict_factory
-    cursor = connection.cursor()
-    cursor.execute("SELECT books.* from books WHERE id = ?;", [book_id])
-    book = cursor.fetchone()
-    connection.close()
-    # в данном методое мы не только отправляем запрос в микросервис но и ждем резулльтата его обработки,
-    # таким образом мы можем сразу получить результат прямо в REST API
-    response = get_search_results({
-        "name": book["name"],
-        "author": book["author"]
-    }, book_id)
-    logger.debug(response)
-    return jsonify({"results": response or []})
-
 
 
 app.run(debug=True)  # запуск сервера
